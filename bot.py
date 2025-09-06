@@ -1,9 +1,13 @@
+import os
 import asyncio
+from contextlib import asynccontextmanager
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.bot import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from fastapi import FastAPI
+import uvicorn
 
 from config import BOT_TOKEN
 from db.database import init_db
@@ -17,8 +21,10 @@ bot = Bot(token=BOT_TOKEN,
           )
 dp = Dispatcher(storage=MemoryStorage())
 
+bot_task = None
 
-async def main():
+async def run_bot():
+    """Запуск бота"""
     try:
         start.register_handlers(dp)
         reminders.register_handlers(dp)
@@ -32,16 +38,60 @@ async def main():
 
         await dp.start_polling(bot)
     except Exception as exc:
-        logger.warning(f"Ошибка в основном цикле бота: {exc}", exc_info=True)
+        logger.error(f"Ошибка в основном цикле бота: {exc}", exc_info=True)
+        raise
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan для управления жизненным циклом FastAPI и бота"""
+    global bot_task
+
+    try:
+        await init_db()
+        logger.info("База данных инициализирована успешно")
+
+        bot_task = asyncio.create_task(run_bot())
+        logger.info("Бот запущен через FastAPI")
+
+    except Exception as e:
+        logger.error(f"Ошибка при запуске: {e}", exc_info=True)
+        raise
+
+    yield
+
+    if bot_task:
+        bot_task.cancel()
+        try:
+            await bot_task
+        except asyncio.CancelledError:
+            logger.info("Бот корректно остановлен")
+
+
+app = FastAPI(
+    title="BurgerKing Bot",
+    lifespan=lifespan
+)
+
+@app.get("/")
+async def root():
+    return {"status": "running", "service": "BurgerKing Telegram Bot"}
+
+
+def run_fastapi():
+    """Запуск FastAPI сервера с поддержкой переменных окружения"""
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+
+    logger.info(f"🚀 Starting server on {host}:{port}")
+
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info"
+    )
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(init_db())
-        logger.info("База данных инициализирована успешно")
-    except Exception as e:
-        logger.warning(f"Ошибка инициализации базы данных: {e}", exc_info=True)
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        logger.warning(f"Ошибка при запуске бота: {e}", exc_info=True)
+    run_fastapi()
