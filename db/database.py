@@ -7,7 +7,7 @@ from db.models import Base
 
 logger = logging.getLogger("my_bot")
 
-DATABASE_URL = "sqlite+aiosqlite:///./db.sqlite3"
+DATABASE_URL = "sqlite+aiosqlite:////opt/build/db.sqlite3"
 
 try:
     engine = create_async_engine(DATABASE_URL, echo=False)
