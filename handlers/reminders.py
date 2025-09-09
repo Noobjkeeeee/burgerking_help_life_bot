@@ -1,21 +1,23 @@
 from aiogram import Dispatcher, types
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-
-from services.user_service import (enable_user_reminders,
-                                   save_user_reminder_time)
+from services.user_service import (
+    create_user,
+    update_reminder_time,
+    enable_reminders,
+)
 from utils.logger import logger
 
 
 async def ask_time(message: types.Message):
     try:
         kb = ReplyKeyboardBuilder()
-        for time in ["8.00", "13.00", "20.00", "22.00"]:
-            kb.button(text=time)
+        for time_option in ["8.00", "13.00", "20.00", "22.00"]:
+            kb.button(text=time_option)
         await message.answer(
-            "Теперь мы будем присылать тебе небольшие"
-            " приятные напоминания каждый день."
-            " Выбери удобное время:",
+            "Теперь мы будем присылать тебе небольшие "
+            "приятные напоминания каждый день. "
+            "Выбери удобное время:",
             reply_markup=kb.as_markup(resize_keyboard=True),
         )
         logger.info(
@@ -31,14 +33,15 @@ async def ask_time(message: types.Message):
 async def set_time(message: types.Message):
     try:
         selected_time = message.text
-
-        await save_user_reminder_time(message.from_user.id, selected_time)
+        user_id = message.from_user.id
+        user = await create_user(user_id, selected_time)
+        await update_reminder_time(user_id, selected_time)
 
         confirmation_text = (
-            "Отлично! 😊 Я буду напоминать тебе голосовать"
-            " каждый день, пока идет акция .\n"
-            "Голосовать просто — это пара кликов,"
-            " но большая поддержка для фонда."
+            "Отлично! 😊 Я буду напоминать тебе голосовать "
+            "каждый день, пока идет акция.\n"
+            "Голосовать просто — это пара кликов, "
+            "но большая поддержка для фонда."
         )
         kb = ReplyKeyboardBuilder()
         kb.button(text="Покажи, как голосовать")
@@ -48,7 +51,7 @@ async def set_time(message: types.Message):
         )
 
         logger.info(
-            f"Пользователь {message.from_user.id} установил время напоминаний: {selected_time}"
+            f"Пользователь {user_id} установил время напоминаний: {selected_time}"
         )
     except Exception as e:
         logger.warning(
@@ -60,13 +63,14 @@ async def set_time(message: types.Message):
 async def additional_response(message: types.Message):
     if message.text == "Хорошо, жду напоминаний":
         try:
-            await enable_user_reminders(message.from_user.id)
+            user_id = message.from_user.id
+            await enable_reminders(user_id)
             await message.answer(
                 "Отлично! Завтра я пришлю тебе напоминание о голосовании 😊",
                 reply_markup=ReplyKeyboardRemove(),
             )
             logger.info(
-                f"Пользователь {message.from_user.id} подтвердил получение напоминаний"
+                f"Пользователь {user_id} подтвердил получение напоминаний"
             )
         except Exception as e:
             logger.warning(

@@ -1,105 +1,62 @@
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+import json
+import os
+from datetime import datetime, date
+from asyncio import Lock
+from typing import Optional
 
-from db.crud import (
-    create_user,
-    crud_get_user_by_telegram_id,
-    enable_user_reminders as crud_enable_user_reminders,
-    get_all_users_with_reminder,
-    get_user_first_interaction_date as db_get_user_first_interaction_date,
-    update_user_first_interaction_date,
-    update_user_reminder_time,
-)
-from db.database import get_db
-from utils.logger import logger
+DATA_FILE = os.path.join(os.path.dirname(__file__), "../data/users_data.json")
 
+lock = Lock()
+users_data = {}
 
-@asynccontextmanager
-async def get_session():
-    try:
-        async for session in get_db():
-            yield session
-    except Exception as e:
-        logger.warning(f"Ошибка при получении сессии БД: {e}", exc_info=True)
-        raise
+def load_users():
+    global users_data
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            try:
+                users_data = json.load(f)
+                for user in users_data.values():
+                    user['first_interaction_date'] = datetime.strptime(user['first_interaction_date'], "%Y-%m-%d").date()
+            except Exception:
+                users_data = {}
+    else:
+        users_data = {}
 
+async def save_users():
+    async with lock:
+        json_ready = {}
+        for k, v in users_data.items():
+            json_ready[k] = {
+                "first_interaction_date": v["first_interaction_date"].strftime("%Y-%m-%d"),
+                "reminder_time": v["reminder_time"],
+                "reminders_enabled": v["reminders_enabled"],
+            }
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(json_ready, f, ensure_ascii=False, indent=2)
 
-async def save_user_reminder_time(user_id: int, time: str):
-    try:
-        async with get_session() as session:
-            user = await crud_get_user_by_telegram_id(session, str(user_id))
-            if user is None:
-                await create_user(session, str(user_id), time)
-                await update_user_first_interaction_date(
-                    session,
-                    str(user_id),
-                    datetime.now(timezone.utc).date(),
-                )
-                logger.info(
-                    f"Создан новый пользователь с telegram_id={user_id} и временем "
-                    f"напоминания {time}"
-                )
-            else:
-                await update_user_reminder_time(session, str(user_id), time)
-                logger.info(
-                    f"Обновлено время напоминания для пользователя telegram_id={user_id} на "
-                    f"{time}"
-                )
-    except Exception as e:
-        logger.warning(
-            f"Ошибка при сохранении времени напоминания для пользователя {user_id}: {e}",
-            exc_info=True,
-        )
-        raise
+async def create_user(user_id: int, reminder_time: str):
+    if str(user_id) not in users_data:
+        users_data[str(user_id)] = {
+            "first_interaction_date": date.today(),
+            "reminder_time": reminder_time,
+            "reminders_enabled": False,
+        }
+        await save_users()
 
+async def update_reminder_time(user_id: int, reminder_time: str):
+    user = users_data.get(str(user_id))
+    if user:
+        user["reminder_time"] = reminder_time
+        await save_users()
+
+async def enable_reminders(user_id: int):
+    user = users_data.get(str(user_id))
+    if user:
+        user["reminders_enabled"] = True
+        await save_users()
+
+async def get_user(user_id: int) -> Optional[dict]:
+    return users_data.get(str(user_id))
 
 async def get_all_users_with_reminders():
-    try:
-        async with get_session() as session:
-            users = await get_all_users_with_reminder(session)
-            return users
-    except Exception as e:
-        logger.warning(
-            f"Ошибка при получении пользователей с напоминаниями: {e}",
-            exc_info=True,
-        )
-        return []
-
-
-async def get_user_first_interaction_date(user_id: int):
-    try:
-        async with get_session() as session:
-            date = await db_get_user_first_interaction_date(session, str(user_id))
-            return date
-    except Exception as e:
-        logger.warning(
-            f"Ошибка при получении даты первого взаимодействия для пользователя "
-            f"{user_id}: {e}",
-            exc_info=True,
-        )
-        return None
-
-
-async def enable_user_reminders(user_id: int):
-    try:
-        async with get_session() as session:
-            user = await crud_enable_user_reminders(session, str(user_id))
-            return user
-    except Exception as e:
-        logger.warning(
-            f"Ошибка при включении напоминаний пользователя {user_id}: {e}",
-            exc_info=True,
-        )
-        return None
-
-
-async def get_user_by_telegram_id(user_id: int):
-    try:
-        async with get_session() as session:
-            user = await crud_get_user_by_telegram_id(session, str(user_id))
-            return user
-    except Exception as e:
-        logger.warning(
-            f"Ошибка при получении пользователя {user_id}: {e}", exc_info=True
-        )
-        return None
+    return [ (int(uid), u) for uid, u in users_data.items() if u.get("reminders_enabled") ]

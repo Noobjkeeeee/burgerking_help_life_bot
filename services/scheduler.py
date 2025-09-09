@@ -21,19 +21,17 @@ async def schedule_daily_jobs():
             current_user_count = len(users)
             if current_user_count != last_logged_user_count:
                 last_logged_user_count = current_user_count
+                logger.info(f"Количество пользователей с напоминаниями: {current_user_count}")
 
-            for user in users:
-                key = (user.telegram_user_id, user.reminder_time, today)
-                if user.reminder_time == now_str:
+            for user_id, user_info in users:
+                key = (user_id, user_info["reminder_time"], today)
+                if user_info["reminder_time"] == now_str:
                     if key not in sent_reminders:
                         logger.info(f"Текущее время: {now_str}")
                         logger.info(
-                            f"Отправка напоминания пользователю"
-                            f" {user.telegram_user_id} в {user.reminder_time}"
+                            f"Отправка напоминания пользователю {user_id} в {user_info['reminder_time']}"
                         )
-                        await send_reminder(int(
-                            user.telegram_user_id),
-                                            day=now_dt.day)
+                        await send_reminder(user_id, now_dt.day)
                         sent_reminders.add(key)
                 else:
                     sent_reminders.discard(key)

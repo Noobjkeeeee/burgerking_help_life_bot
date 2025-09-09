@@ -1,22 +1,21 @@
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
 from keyboards.voting_kb import voting_keyboard
+from services.user_service import get_all_users_with_reminders
 from services.message_service import get_daily_message_pair
-from services.user_service import (get_all_users_with_reminders,
-                                   get_user_by_telegram_id)
 from utils.logger import logger
+
 
 
 async def send_reminder(user_id: int, day: int):
     from bot import bot
-
     try:
-        user = await get_user_by_telegram_id(user_id)
-        if not user:
+        users = await get_all_users_with_reminders()
+        user_data = dict(users).get(user_id)
+        if not user_data:
             return
 
-        first_interaction_date = user.first_interaction_date
-        reminders_enabled = user.reminders_enabled
+        first_interaction_date = user_data["first_interaction_date"]
+        reminders_enabled = user_data["reminders_enabled"]
         today_date = datetime.now(timezone.utc).date()
 
         if not reminders_enabled or first_interaction_date == today_date:
@@ -27,7 +26,6 @@ async def send_reminder(user_id: int, day: int):
             return
 
         day_num = (today_date - first_interaction_date).days + 1
-
         msg_1, msg_2 = get_daily_message_pair(day_num)
 
         logger.info(
@@ -53,8 +51,8 @@ async def send_daily_messages():
     try:
         users = await get_all_users_with_reminders()
         day_of_campaign = (datetime.now(timezone.utc).day % 30) or 1
-        for user in users:
-            await send_reminder(int(user.telegram_user_id), day_of_campaign)
+        for user_id, _ in users:
+            await send_reminder(user_id, day_of_campaign)
         logger.info(
             f"Отправлены ежедневные напоминания для {len(users)} пользователей за день {day_of_campaign}"
         )

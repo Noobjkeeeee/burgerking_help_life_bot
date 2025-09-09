@@ -10,10 +10,11 @@ from fastapi import FastAPI
 import uvicorn
 
 from config import BOT_TOKEN
-from db.database import init_db
+
 from handlers import instructions, reminders, start
 from handlers.start import set_bot_commands
 from services.scheduler import schedule_daily_jobs
+from services.user_service import load_users
 from utils.logger import logger
 
 bot = Bot(token=BOT_TOKEN,
@@ -44,12 +45,11 @@ async def run_bot():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan для управления жизненным циклом FastAPI и бота"""
     global bot_task
 
     try:
-        await init_db()
-        logger.info("База данных инициализирована успешно")
+        load_users()
+        logger.info("Пользователи загружены из JSON")
 
         bot_task = asyncio.create_task(run_bot())
         logger.info("Бот запущен через FastAPI")

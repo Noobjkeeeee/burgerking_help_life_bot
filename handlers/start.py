@@ -1,5 +1,4 @@
 import os
-
 from aiogram import Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import BotCommand, BotCommandScopeDefault, FSInputFile
@@ -7,13 +6,11 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 from handlers.reminders import ask_time
 from utils.logger import logger
+from services.user_service import load_users
 
 
 async def set_bot_commands(bot):
-    commands = [BotCommand(
-        command="start",
-        description="Запуск бота и основное меню"
-    )]
+    commands = [BotCommand(command="start", description="Запуск бота и основное меню")]
     await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
 
 
@@ -49,14 +46,9 @@ async def cmd_start(message: types.Message):
             reply_markup=kb.as_markup(resize_keyboard=True),
         )
 
-        logger.info(
-            f"Команда /start выполнена пользователем {message.from_user.id}"
-        )
+        logger.info(f"Команда /start выполнена пользователем {message.from_user.id}")
     except Exception as e:
-        logger.warning(
-            f"Ошибка в cmd_start для пользователя {message.from_user.id}: {e}",
-            exc_info=True,
-        )
+        logger.warning(f"Ошибка в cmd_start для пользователя {message.from_user.id}: {e}", exc_info=True)
 
 
 async def reminder_entry(message: types.Message):
@@ -64,22 +56,16 @@ async def reminder_entry(message: types.Message):
         await ask_time(message)
         logger.info(f"Вызов напоминания пользователем {message.from_user.id}")
     except Exception as e:
-        logger.warning(
-            f"Ошибка в reminder_entry для пользователя"
-            f" {message.from_user.id}: {e}",
-            exc_info=True,
-        )
+        logger.warning(f"Ошибка в reminder_entry для пользователя {message.from_user.id}: {e}", exc_info=True)
 
 
 def register_handlers(dp: Dispatcher):
     try:
         dp.message.register(cmd_start, Command(commands=["start"]))
-        dp.message.register(
-            reminder_entry, lambda msg: msg.text == "Хочу получать напоминания"
-        )
+        dp.message.register(reminder_entry, lambda msg: msg.text == "Хочу получать напоминания")
         logger.info("Зарегистрированы обработчики start.py")
     except Exception as e:
-        logger.warning(
-            f"Ошибка при регистрации обработчиков в start.py: {e}",
-            exc_info=True
-        )
+        logger.warning(f"Ошибка при регистрации обработчиков в start.py: {e}", exc_info=True)
+
+
+load_users()
