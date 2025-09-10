@@ -5,9 +5,12 @@ from services.message_service import get_daily_message_pair
 from utils.logger import logger
 
 
+moscow_tz = timezone(timedelta(hours=3))
+
 
 async def send_reminder(user_id: int, day: int):
     from bot import bot
+
     try:
         users = await get_all_users_with_reminders()
         user_data = dict(users).get(user_id)
@@ -16,7 +19,9 @@ async def send_reminder(user_id: int, day: int):
 
         first_interaction_date = user_data["first_interaction_date"]
         reminders_enabled = user_data["reminders_enabled"]
-        today_date = datetime.now(timezone.utc).date()
+
+        now_dt = datetime.now(timezone.utc).astimezone(moscow_tz)
+        today_date = now_dt.date()
 
         if not reminders_enabled or first_interaction_date == today_date:
             logger.info(

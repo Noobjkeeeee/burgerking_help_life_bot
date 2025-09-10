@@ -16,7 +16,9 @@ def load_users():
             try:
                 users_data = json.load(f)
                 for user in users_data.values():
-                    user['first_interaction_date'] = datetime.strptime(user['first_interaction_date'], "%Y-%m-%d").date()
+                    user['first_interaction_date'] = datetime.strptime(
+                        user['first_interaction_date'], "%Y-%m-%d"
+                    ).date()
             except Exception:
                 users_data = {}
     else:
