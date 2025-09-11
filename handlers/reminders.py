@@ -12,7 +12,7 @@ from utils.logger import logger
 async def ask_time(message: types.Message):
     try:
         kb = ReplyKeyboardBuilder()
-        for time_option in ["8.00", "13.00", "20.00", "22.00"]:
+        for time_option in ["08.00", "13.00", "20.00", "22.00"]:
             kb.button(text=time_option)
         await message.answer(
             "Теперь мы будем присылать тебе небольшие "
@@ -85,7 +85,7 @@ def register_handlers(dp: Dispatcher):
             ask_time, lambda msg: msg.text == "Хочу получать напоминания"
         )
         dp.message.register(
-            set_time, lambda msg: msg.text in ["8.00", "13.00", "20.00", "22.00"]
+            set_time, lambda msg: msg.text in ["08.00", "13.00", "20.00", "22.00"]
         )
         dp.message.register(
             additional_response, lambda msg: msg.text == "Хорошо, жду напоминаний"
